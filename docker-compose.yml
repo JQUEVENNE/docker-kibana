@@ -1,0 +1,88 @@
+version: '3.0'
+
+services:
+    dk-elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.2.3
+        container_name: dk-elasticsearch
+        volumes:
+            - ${DOCKER_DK_ELASTICSEARCH_DATA_DIR}:/usr/share/elasticsearch/data
+        ports:
+            - "9200:9200"
+        environment:
+            - cluster.name=dk-elasticsearch-cluster
+            - bootstrap.memory_lock=true
+            - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        ulimits:
+            memlock:
+                soft: -1
+                hard: -1
+        networks:
+            - log-dk-net
+
+    dk-logstash:
+        image: docker.elastic.co/logstash/logstash-oss:6.2.3
+        container_name: dk-logstash
+        expose:
+            - "12201"
+        ports:
+            - "12201:12201"
+            - "12201:12201/udp"
+        volumes:
+            - ./docker/logstash/pipeline/:/usr/share/logstash/pipeline/
+        environment:
+            TZ: Europe/Paris
+        networks:
+            - log-dk-net
+        depends_on:
+          - dk-elasticsearch
+
+    dk-kibana:
+        image: docker.elastic.co/kibana/kibana-oss:6.2.3
+        container_name: dk-kibana
+        ports:
+           - "5601:5601"
+        environment:
+            ELASTICSEARCH_URL: http://dk-elasticsearch:9200
+        networks:
+            - log-dk-net
+        depends_on:
+          - dk-elasticsearch
+
+    dk-php:
+        container_name: dk-php
+        image: cmeneses/php-fpm:7.1
+        volumes:
+            - ${DOCKER_DK_SRC_DIR}:/var/www/html
+        networks:
+            - dk-net
+            - log-dk-net
+        logging:
+            driver: gelf
+            options:
+                gelf-address: "udp://localhost:12201"
+                tag: "DK PHP"
+
+    dk-web:
+        container_name: dk-web
+        image: cmeneses/apache:2.4
+        ports:
+            - ${DOCKER_DK_WEB_PORT}:80
+        environment:
+            FPM_HOST: dk-php:9000
+        volumes:
+            - ${DOCKER_DK_SRC_DIR}:/var/www/html
+        networks:
+            - dk-net
+            - log-dk-net
+        depends_on:
+            - dk-php
+        logging:
+            driver: gelf
+            options:
+                gelf-address: "udp://localhost:12201"
+                tag: "DK WEB"
+networks:
+    dk-net:
+      driver: bridge
+    log-dk-net:
+      driver: bridge
