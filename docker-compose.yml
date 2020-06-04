@@ -50,7 +50,7 @@ services:
 
     dk-php:
         container_name: dk-php
-        image: cmeneses/php-fpm:7.1
+        image: bitnami/php-fpm:7.1
         volumes:
             - ${DOCKER_DK_SRC_DIR}:/var/www/html
         networks:
@@ -64,7 +64,7 @@ services:
 
     dk-web:
         container_name: dk-web
-        image: cmeneses/apache:2.4
+        image: bitnami/apache:latest
         ports:
             - ${DOCKER_DK_WEB_PORT}:80
         environment:
